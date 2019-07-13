@@ -5,7 +5,8 @@
 #include "ScreenRendering.h"
 #include "PostProcess/SceneRenderTargets.h"
 #include "Modules/ModuleManager.h"
-#include "CommonRenderResources.h"
+#include "PipelineStateCache.h"
+//#include "CommonRenderResources.h"
 
 APostProcessToolkitHelper::APostProcessToolkitHelper()
 {
@@ -34,6 +35,8 @@ void UPostProcessToolkitHelperComponent::TickComponent(float DeltaTime, enum ELe
 	[RTResource, Scene, ViewportX, ViewportY](FRHICommandListImmediate& RHICmdList)
 	{
 		//UE_LOG(LogTemp, Log, TEXT("RTRes %p"), RTRes);
+        static const FName RendererModuleName( "Renderer" );
+        IRendererModule* RendererModule = &FModuleManager::GetModuleChecked<IRendererModule>(RendererModuleName);
 
 		FRHIRenderPassInfo RPInfo(RTResource->GetRenderTargetTexture(), ERenderTargetActions::Load_Store);
 		RHICmdList.BeginRenderPass(RPInfo, TEXT("PostProcessToolkitHelperCopySceneColor"));
@@ -51,27 +54,18 @@ void UPostProcessToolkitHelperComponent::TickComponent(float DeltaTime, enum ELe
 			TShaderMapRef<FScreenVS> VertexShader(ShaderMap);
 			TShaderMapRef<FScreenPS> PixelShader(ShaderMap);
 
-			GraphicsPSOInit.BoundShaderState.VertexDeclarationRHI = GFilterVertexDeclaration.VertexDeclarationRHI;
+			GraphicsPSOInit.BoundShaderState.VertexDeclarationRHI = RendererModule->GetFilterVertexDeclaration().VertexDeclarationRHI;
 			GraphicsPSOInit.BoundShaderState.VertexShaderRHI = GETSAFERHISHADER_VERTEX(*VertexShader);
 			GraphicsPSOInit.BoundShaderState.PixelShaderRHI = GETSAFERHISHADER_PIXEL(*PixelShader);
 			GraphicsPSOInit.PrimitiveType = PT_TriangleList;
 
 			SetGraphicsPipelineState(RHICmdList, GraphicsPSOInit);
 
-
 			FSceneRenderTargets& SceneRenderTargets = FSceneRenderTargets::Get(RHICmdList);
 			auto SceneColorTextureRHI = SceneRenderTargets.GetSceneColorTexture();
 			
 			PixelShader->SetParameters(RHICmdList, TStaticSamplerState<SF_Bilinear>::GetRHI(), SceneColorTextureRHI);
-
-			float U = 0;
-			float V = 0;
-			float SizeU = 1;
-			float SizeV = 1;
-
-			static const FName RendererModuleName( "Renderer" );
-			IRendererModule* RendererModule = &FModuleManager::GetModuleChecked<IRendererModule>(RendererModuleName);
-
+            
 			RendererModule->DrawRectangle(
 				RHICmdList,
 				0, 0,

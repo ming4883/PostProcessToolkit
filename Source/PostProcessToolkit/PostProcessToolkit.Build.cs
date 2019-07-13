@@ -46,6 +46,11 @@ public class PostProcessToolkit : ModuleRules
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);
+
+#if (UE_4_22_OR_LATER)
+#else
+        PrivateDependencyModuleNames.Add("ShaderCore");
+#endif
 		
 		
 		DynamicallyLoadedModuleNames.AddRange(
