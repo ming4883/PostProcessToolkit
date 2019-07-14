@@ -1,4 +1,4 @@
-#include "PostProcessToolkitHelper.h"
+#include "PPToolkitHelper.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -8,19 +8,22 @@
 #include "PipelineStateCache.h"
 //#include "CommonRenderResources.h"
 
-APostProcessToolkitHelper::APostProcessToolkitHelper()
+APPToolkitHelper::APPToolkitHelper()
 {
-	HelperComponent = CreateDefaultSubobject<UPostProcessToolkitHelperComponent>("Helper");
-	AddOwnedComponent(HelperComponent);
-	SetRootComponent(HelperComponent);
+	SceneColorCapture = CreateDefaultSubobject<UPPToolkitSceneColorCopyComponent>("SceneColorCapture");
+	AddOwnedComponent(SceneColorCapture);
+    
+    ProcessorChain = CreateDefaultSubobject<UPPToolkitProcessorComponent>("ProcessorChain");
+    AddOwnedComponent(ProcessorChain);
+
 }
 
-UPostProcessToolkitHelperComponent::UPostProcessToolkitHelperComponent()
+UPPToolkitSceneColorCopyComponent::UPPToolkitSceneColorCopyComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
 }
 
-void UPostProcessToolkitHelperComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction)
+void UPPToolkitSceneColorCopyComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction)
 {
 	//UE_LOG(LogTemp, Log, TEXT("Tick %f"), DeltaTime);
 	if (!RenderTarget)
@@ -31,7 +34,7 @@ void UPostProcessToolkitHelperComponent::TickComponent(float DeltaTime, enum ELe
 	
 	uint32 ViewportX = (uint32)RenderTarget->SizeX, ViewportY = (uint32)RenderTarget->SizeY;
 
-	ENQUEUE_RENDER_COMMAND(PostProcessToolkitHelperCopySceneColor)(
+	ENQUEUE_RENDER_COMMAND(PPToolkitHelperCopySceneColor)(
 	[RTResource, Scene, ViewportX, ViewportY](FRHICommandListImmediate& RHICmdList)
 	{
 		//UE_LOG(LogTemp, Log, TEXT("RTRes %p"), RTRes);
@@ -39,7 +42,7 @@ void UPostProcessToolkitHelperComponent::TickComponent(float DeltaTime, enum ELe
         IRendererModule* RendererModule = &FModuleManager::GetModuleChecked<IRendererModule>(RendererModuleName);
 
 		FRHIRenderPassInfo RPInfo(RTResource->GetRenderTargetTexture(), ERenderTargetActions::Load_Store);
-		RHICmdList.BeginRenderPass(RPInfo, TEXT("PostProcessToolkitHelperCopySceneColor"));
+		RHICmdList.BeginRenderPass(RPInfo, TEXT("PPToolkitHelperCopySceneColor"));
 		{
 			RHICmdList.SetViewport(0, 0, 0.0f, ViewportX, ViewportY, 1.0f);
 
@@ -84,4 +87,13 @@ void UPostProcessToolkitHelperComponent::TickComponent(float DeltaTime, enum ELe
 			RTResource->TextureRHI,  
 			FResolveParams());
 	});
+}
+
+UPPToolkitProcessorComponent::UPPToolkitProcessorComponent()
+{
+    PrimaryComponentTick.bCanEverTick = true;
+}
+
+void UPPToolkitProcessorComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction)
+{
 }
