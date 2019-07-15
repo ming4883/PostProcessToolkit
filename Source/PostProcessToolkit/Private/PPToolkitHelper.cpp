@@ -6,6 +6,9 @@
 #include "PostProcess/SceneRenderTargets.h"
 #include "Modules/ModuleManager.h"
 #include "PipelineStateCache.h"
+#include "Kismet/KismetMaterialLibrary.h"
+#include "Kismet/KismetRenderingLibrary.h"
+#include "Engine/Canvas.h"
 //#include "CommonRenderResources.h"
 
 APPToolkitHelper::APPToolkitHelper()
@@ -25,7 +28,8 @@ UPPToolkitSceneColorCopyComponent::UPPToolkitSceneColorCopyComponent()
 
 void UPPToolkitSceneColorCopyComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction)
 {
-	//UE_LOG(LogTemp, Log, TEXT("Tick %f"), DeltaTime);
+	// TODO: check is dedicated server
+    
 	if (!RenderTarget)
 		return;
 
@@ -92,8 +96,61 @@ void UPPToolkitSceneColorCopyComponent::TickComponent(float DeltaTime, enum ELev
 UPPToolkitProcessorComponent::UPPToolkitProcessorComponent()
 {
     PrimaryComponentTick.bCanEverTick = true;
+    bProcessorChainDirty = true;
 }
 
 void UPPToolkitProcessorComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction)
 {
+    // TODO: check is dedicated server
+    PrepareProcessorChain();
+    ExecuteProcessorChain();
+}
+
+void UPPToolkitProcessorComponent::PrepareProcessorChain()
+{
+    if (!bProcessorChainDirty)
+        return;
+    
+    UWorld* World = GetOwner()->GetWorld();
+    
+    for(int32 i = 0; i < ProcessorChain.Num(); ++i)
+    {
+        auto& Processor = ProcessorChain[i];
+        if (!Processor.SourceMaterial)
+            continue;
+        
+        Processor.SourceMaterialInst = UKismetMaterialLibrary::CreateDynamicMaterialInstance(World, Processor.SourceMaterial);
+    }
+    
+    bProcessorChainDirty = false;
+}
+
+void UPPToolkitProcessorComponent::ExecuteProcessorChain()
+{
+    UWorld* World = GetOwner()->GetWorld();
+    
+    FVector2D Zero(0, 0);
+    FVector2D DrawSize;
+    UCanvas* DrawCanvas;
+    FDrawToRenderTargetContext DrawContext;
+    
+    for(int32 i = 0; i < ProcessorChain.Num(); ++i)
+    {
+        auto& Processor = ProcessorChain[i];
+        if (!Processor.SourceMaterialInst)
+            continue;
+        
+        if (!Processor.SourceRenderTarget)
+            continue;
+        
+        if (!Processor.DestRenderTarget)
+            continue;
+        
+        auto Mtl = Processor.SourceMaterialInst;
+        Mtl->SetTextureParameterValue(Processor.SourceName, Processor.SourceRenderTarget);
+        
+        UKismetRenderingLibrary::BeginDrawCanvasToRenderTarget(World, Processor.DestRenderTarget, DrawCanvas, DrawSize, DrawContext);
+        DrawCanvas->K2_DrawMaterial(Mtl, Zero, DrawSize, Zero);
+        UKismetRenderingLibrary::EndDrawCanvasToRenderTarget(World, DrawContext);
+    }
 }

@@ -43,9 +43,6 @@ struct POSTPROCESSTOOLKIT_API FPPToolkitProcessor
     GENERATED_BODY()
     
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
-    class UTextureRenderTarget2D* DestRenderTarget;
-    
-    UPROPERTY(BlueprintReadWrite, EditAnywhere)
     class UTextureRenderTarget2D* SourceRenderTarget;
     
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
@@ -53,6 +50,9 @@ struct POSTPROCESSTOOLKIT_API FPPToolkitProcessor
     
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     class UMaterialInterface* SourceMaterial;
+    
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    class UTextureRenderTarget2D* DestRenderTarget;
     
     UPROPERTY(Transient, VisibleDefaultsOnly)
     class UMaterialInstanceDynamic* SourceMaterialInst;
@@ -71,4 +71,9 @@ public:
     
 public:
     virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction) override;
+    
+protected:
+    bool bProcessorChainDirty = true;
+    void PrepareProcessorChain();
+    void ExecuteProcessorChain();
 };
