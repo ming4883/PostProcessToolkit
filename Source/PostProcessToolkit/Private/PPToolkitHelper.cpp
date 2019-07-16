@@ -45,13 +45,15 @@ void UPPToolkitSceneColorCopyComponent::TickComponent(float DeltaTime, enum ELev
         static const FName RendererModuleName( "Renderer" );
         IRendererModule* RendererModule = &FModuleManager::GetModuleChecked<IRendererModule>(RendererModuleName);
 
-		FRHIRenderPassInfo RPInfo(RTResource->GetRenderTargetTexture(), ERenderTargetActions::Load_Store);
+        auto RTTextureRHI = RTResource->GetRenderTargetTexture();
+		FRHIRenderPassInfo RPInfo(RTTextureRHI, ERenderTargetActions::Load_Store);
 		RHICmdList.BeginRenderPass(RPInfo, TEXT("PPToolkitHelperCopySceneColor"));
 		{
-			RHICmdList.SetViewport(0, 0, 0.0f, ViewportX, ViewportY, 1.0f);
-
 			FGraphicsPipelineStateInitializer GraphicsPSOInit;
+            SetRenderTarget(RHICmdList, RTTextureRHI, FTextureRHIRef());
 			RHICmdList.ApplyCachedRenderTargets(GraphicsPSOInit);
+            RHICmdList.SetViewport(0, 0, 0.0f, ViewportX, ViewportY, 1.0f);
+            
 			GraphicsPSOInit.BlendState = TStaticBlendState<>::GetRHI();
 			GraphicsPSOInit.RasterizerState = TStaticRasterizerState<>::GetRHI();
 			GraphicsPSOInit.DepthStencilState = TStaticDepthStencilState<false, CF_Always>::GetRHI();
@@ -73,16 +75,17 @@ void UPPToolkitSceneColorCopyComponent::TickComponent(float DeltaTime, enum ELev
 			
 			PixelShader->SetParameters(RHICmdList, TStaticSamplerState<SF_Bilinear>::GetRHI(), SceneColorTextureRHI);
             
-			RendererModule->DrawRectangle(
-				RHICmdList,
-				0, 0,
-				ViewportX, ViewportY,
-				0.0f, 0.0f,
-				1.0f, 1.0f,
-				FIntPoint(ViewportX, ViewportY),
-				FIntPoint(1, 1),
-				*VertexShader,
-				EDRF_Default);
+            RendererModule->DrawRectangle(
+                RHICmdList,
+                0, 0,                                   // Dest X, Y
+                ViewportX,                              // Dest Width
+                ViewportY,                              // Dest Height
+                0, 0,                                   // Source U, V
+                1, 1,                                   // Source USize, VSize
+                FIntPoint(ViewportX, ViewportY),        // Target buffer size
+                FIntPoint(1, 1),                        // Source texture size
+                *VertexShader,
+                EDRF_Default);
 
 		}
 		RHICmdList.EndRenderPass();
