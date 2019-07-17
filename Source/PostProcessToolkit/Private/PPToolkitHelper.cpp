@@ -9,6 +9,15 @@
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Kismet/KismetRenderingLibrary.h"
 #include "Engine/Canvas.h"
+
+
+#include "Engine/GameViewportClient.h"
+#include "Slate/SceneViewport.h"
+
+#if WITH_EDITOR
+#include "Editor.h"
+#include "LevelEditorViewport.h"
+#endif
 //#include "CommonRenderResources.h"
 
 APPToolkitHelper::APPToolkitHelper()
@@ -18,7 +27,12 @@ APPToolkitHelper::APPToolkitHelper()
 	
 	ProcessorChain = CreateDefaultSubobject<UPPToolkitProcessorComponent>("ProcessorChain");
 	AddOwnedComponent(ProcessorChain);
+}
 
+void APPToolkitHelper::Refresh()
+{
+    SceneColorCapture->UpdateRenderTarget();
+    ProcessorChain->UpdateProcessorChain();
 }
 
 UPPToolkitSceneColorCopyComponent::UPPToolkitSceneColorCopyComponent()
@@ -29,17 +43,41 @@ UPPToolkitSceneColorCopyComponent::UPPToolkitSceneColorCopyComponent()
 void UPPToolkitSceneColorCopyComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction)
 {
 	// TODO: check is dedicated server
-	
+    UpdateRenderTarget();
+}
+
+void UPPToolkitSceneColorCopyComponent::UpdateRenderTarget()
+{
 	if (!RenderTarget)
 		return;
 
 	auto RTResource = RenderTarget->GameThread_GetRenderTargetResource();
 	auto Scene = GetOwner()->GetWorld()->Scene;
-	
-	uint32 ViewportX = (uint32)RenderTarget->SizeX, ViewportY = (uint32)RenderTarget->SizeY;
+	auto GameViewportClient = GEngine->GameViewportForWorld(GetOwner()->GetWorld());
+    uint32 GameVPSizeX = 1, GameVPSizeY = 1;
+    const TCHAR* VpSource = TEXT("Game");
+    /*
+#if WITH_EDITOR
+    if (GEditor->bIsSimulatingInEditor)
+    {
+        FViewport* pViewPort = GEditor->GetActiveViewport();
+        GameVPSizeX = pViewPort->GetSizeXY().X;
+        GameVPSizeY = pViewPort->GetSizeXY().Y;
+        VpSource = TEXT("Editor");
+
+    } else
+#endif
+    */
+    if (GameViewportClient)
+    {
+        GameVPSizeX = GameViewportClient->GetGameViewport()->GetRenderTargetTextureSizeXY().X;
+        GameVPSizeY = GameViewportClient->GetGameViewport()->GetRenderTargetTextureSizeXY().Y;
+    }
+    
+	uint32 RTSizeX = (uint32)RenderTarget->SizeX, RTSizeY = (uint32)RenderTarget->SizeY;
 
 	ENQUEUE_RENDER_COMMAND(PPToolkitHelperCopySceneColor)(
-	[RTResource, Scene, ViewportX, ViewportY](FRHICommandListImmediate& RHICmdList)
+	[RTResource, Scene, RTSizeX, RTSizeY, GameVPSizeX, GameVPSizeY, VpSource](FRHICommandListImmediate& RHICmdList)
 	{
 		//UE_LOG(LogTemp, Log, TEXT("RTRes %p"), RTRes);
 		static const FName RendererModuleName( "Renderer" );
@@ -53,7 +91,7 @@ void UPPToolkitSceneColorCopyComponent::TickComponent(float DeltaTime, enum ELev
 			FGraphicsPipelineStateInitializer GraphicsPSOInit;
 			
 			RHICmdList.ApplyCachedRenderTargets(GraphicsPSOInit);
-			RHICmdList.SetViewport(0, 0, 0.0f, ViewportX, ViewportY, 1.0f);
+			RHICmdList.SetViewport(0, 0, 0.0f, RTSizeX, RTSizeY, 1.0f);
 			
 			GraphicsPSOInit.BlendState = TStaticBlendState<>::GetRHI();
 			GraphicsPSOInit.RasterizerState = TStaticRasterizerState<>::GetRHI();
@@ -70,29 +108,31 @@ void UPPToolkitSceneColorCopyComponent::TickComponent(float DeltaTime, enum ELev
 			GraphicsPSOInit.PrimitiveType = PT_TriangleList;
 
 			SetGraphicsPipelineState(RHICmdList, GraphicsPSOInit);
-
+            
 			FSceneRenderTargets& SceneRenderTargets = FSceneRenderTargets::Get(RHICmdList);
 			auto SceneColorTextureRHI = SceneRenderTargets.GetSceneColorTexture();
+            
+            //UE_LOG(LogTemp, Log, TEXT("buf %d x %d; vp %d x %d; src %s"), SceneColorTextureRHI->GetSizeXYZ().X, SceneColorTextureRHI->GetSizeXYZ().Y, GameVPSizeX, GameVPSizeY, VpSource);
 			
 			PixelShader->SetParameters(RHICmdList, TStaticSamplerState<SF_Bilinear>::GetRHI(), SceneColorTextureRHI);
 			
 			RendererModule->DrawRectangle(
 				RHICmdList,
 				0, 0,                                   // Dest X, Y
-				ViewportX,                              // Dest Width
-				ViewportY,                              // Dest Height
+				RTSizeX,                                // Dest Width
+				RTSizeY,                                // Dest Height
 				0, 0,                                   // Source U, V
 				1, 1,                                   // Source USize, VSize
-				FIntPoint(ViewportX, ViewportY),        // Target buffer size
+				FIntPoint(RTSizeX, RTSizeY),            // Target buffer size
 				FIntPoint(1, 1),                        // Source texture size
 				*VertexShader,
 				EDRF_Default);
 
 		}
 		RHICmdList.EndRenderPass();
-		RHICmdList.CopyToResolveTarget(  
-			RTResource->GetRenderTargetTexture(),  
-			RTResource->TextureRHI,  
+		RHICmdList.CopyToResolveTarget(
+			RTResource->GetRenderTargetTexture(),
+			RTResource->TextureRHI,
 			FResolveParams());
 	});
 }
@@ -106,8 +146,13 @@ UPPToolkitProcessorComponent::UPPToolkitProcessorComponent()
 void UPPToolkitProcessorComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction)
 {
 	// TODO: check is dedicated server
-	PrepareProcessorChain();
-	ExecuteProcessorChain();
+    UpdateProcessorChain();
+}
+
+void UPPToolkitProcessorComponent::UpdateProcessorChain()
+{
+    PrepareProcessorChain();
+    ExecuteProcessorChain();
 }
 
 void UPPToolkitProcessorComponent::PrepareProcessorChain()

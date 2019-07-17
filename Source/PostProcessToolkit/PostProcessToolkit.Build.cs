@@ -47,6 +47,9 @@ public class PostProcessToolkit : ModuleRules
 			}
 			);
 
+        if (Target.Type == TargetType.Editor)
+            PrivateDependencyModuleNames.Add("UnrealEd");
+
 #if (UE_4_22_OR_LATER)
 #else
         PrivateDependencyModuleNames.Add("ShaderCore");

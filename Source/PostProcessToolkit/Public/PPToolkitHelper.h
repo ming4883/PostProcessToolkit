@@ -11,6 +11,9 @@ class POSTPROCESSTOOLKIT_API APPToolkitHelper : public AActor
 
 public:
 	APPToolkitHelper();
+    
+    UFUNCTION(CallInEditor)
+        void Refresh();
 
 	UPROPERTY(EditAnywhere)
 		class UPPToolkitSceneColorCopyComponent* SceneColorCapture;
@@ -34,6 +37,8 @@ public:
 
 public:
 	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction) override;
+    
+    void UpdateRenderTarget();
 };
 
 
@@ -71,6 +76,8 @@ public:
     
 public:
     virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction) override;
+    
+    void UpdateProcessorChain();
     
 protected:
     bool bProcessorChainDirty = true;
