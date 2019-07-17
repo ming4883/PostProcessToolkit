@@ -31,8 +31,8 @@ APPToolkitHelper::APPToolkitHelper()
 
 void APPToolkitHelper::Refresh()
 {
-    SceneColorCapture->UpdateRenderTarget();
-    ProcessorChain->UpdateProcessorChain();
+	SceneColorCapture->UpdateRenderTarget();
+	ProcessorChain->UpdateProcessorChain();
 }
 
 UPPToolkitSceneColorCopyComponent::UPPToolkitSceneColorCopyComponent()
@@ -43,7 +43,7 @@ UPPToolkitSceneColorCopyComponent::UPPToolkitSceneColorCopyComponent()
 void UPPToolkitSceneColorCopyComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction)
 {
 	// TODO: check is dedicated server
-    UpdateRenderTarget();
+	UpdateRenderTarget();
 }
 
 void UPPToolkitSceneColorCopyComponent::UpdateRenderTarget()
@@ -54,30 +54,30 @@ void UPPToolkitSceneColorCopyComponent::UpdateRenderTarget()
 	auto RTResource = RenderTarget->GameThread_GetRenderTargetResource();
 	auto Scene = GetOwner()->GetWorld()->Scene;
 	auto GameViewportClient = GEngine->GameViewportForWorld(GetOwner()->GetWorld());
-    uint32 GameVPSizeX = 1, GameVPSizeY = 1;
-    const TCHAR* VpSource = TEXT("Game");
-    /*
+	uint32 GameVPSizeX = 1, GameVPSizeY = 1;
+	/*
 #if WITH_EDITOR
-    if (GEditor->bIsSimulatingInEditor)
-    {
-        FViewport* pViewPort = GEditor->GetActiveViewport();
-        GameVPSizeX = pViewPort->GetSizeXY().X;
-        GameVPSizeY = pViewPort->GetSizeXY().Y;
-        VpSource = TEXT("Editor");
+	if (GEditor->bIsSimulatingInEditor)
+	{
+		FViewport* pViewPort = GEditor->GetActiveViewport();
+		GameVPSizeX = pViewPort->GetSizeXY().X;
+		GameVPSizeY = pViewPort->GetSizeXY().Y;
+		VpSource = TEXT("Editor");
 
-    } else
+	} else
 #endif
-    */
-    if (GameViewportClient)
-    {
-        GameVPSizeX = GameViewportClient->GetGameViewport()->GetRenderTargetTextureSizeXY().X;
-        GameVPSizeY = GameViewportClient->GetGameViewport()->GetRenderTargetTextureSizeXY().Y;
-    }
-    
+	*/
+	if (GameViewportClient)
+	{
+		FViewport* Vp = GameViewportClient->GetGameViewport();
+		GameVPSizeX = Vp->GetSizeXY().X;
+		GameVPSizeY = Vp->GetSizeXY().Y;
+	}
+	
 	uint32 RTSizeX = (uint32)RenderTarget->SizeX, RTSizeY = (uint32)RenderTarget->SizeY;
 
 	ENQUEUE_RENDER_COMMAND(PPToolkitHelperCopySceneColor)(
-	[RTResource, Scene, RTSizeX, RTSizeY, GameVPSizeX, GameVPSizeY, VpSource](FRHICommandListImmediate& RHICmdList)
+	[RTResource, Scene, RTSizeX, RTSizeY, GameVPSizeX, GameVPSizeY](FRHICommandListImmediate& RHICmdList)
 	{
 		//UE_LOG(LogTemp, Log, TEXT("RTRes %p"), RTRes);
 		static const FName RendererModuleName( "Renderer" );
@@ -108,21 +108,23 @@ void UPPToolkitSceneColorCopyComponent::UpdateRenderTarget()
 			GraphicsPSOInit.PrimitiveType = PT_TriangleList;
 
 			SetGraphicsPipelineState(RHICmdList, GraphicsPSOInit);
-            
+			
 			FSceneRenderTargets& SceneRenderTargets = FSceneRenderTargets::Get(RHICmdList);
 			auto SceneColorTextureRHI = SceneRenderTargets.GetSceneColorTexture();
-            
-            //UE_LOG(LogTemp, Log, TEXT("buf %d x %d; vp %d x %d; src %s"), SceneColorTextureRHI->GetSizeXYZ().X, SceneColorTextureRHI->GetSizeXYZ().Y, GameVPSizeX, GameVPSizeY, VpSource);
+			
+			UE_LOG(LogTemp, Log, TEXT("buf %d x %d; vp %d x %d"), SceneColorTextureRHI->GetSizeXYZ().X, SceneColorTextureRHI->GetSizeXYZ().Y, GameVPSizeX, GameVPSizeY);
 			
 			PixelShader->SetParameters(RHICmdList, TStaticSamplerState<SF_Bilinear>::GetRHI(), SceneColorTextureRHI);
 			
+			float UScale = FMath::Clamp(GameVPSizeX / (float)SceneColorTextureRHI->GetSizeXYZ().X, 0.0f, 1.0f);
+			float VScale = FMath::Clamp(GameVPSizeY / (float)SceneColorTextureRHI->GetSizeXYZ().Y, 0.0f, 1.0f);
 			RendererModule->DrawRectangle(
 				RHICmdList,
 				0, 0,                                   // Dest X, Y
 				RTSizeX,                                // Dest Width
 				RTSizeY,                                // Dest Height
 				0, 0,                                   // Source U, V
-				1, 1,                                   // Source USize, VSize
+				UScale, VScale,                         // Source USize, VSize
 				FIntPoint(RTSizeX, RTSizeY),            // Target buffer size
 				FIntPoint(1, 1),                        // Source texture size
 				*VertexShader,
@@ -146,13 +148,13 @@ UPPToolkitProcessorComponent::UPPToolkitProcessorComponent()
 void UPPToolkitProcessorComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction)
 {
 	// TODO: check is dedicated server
-    UpdateProcessorChain();
+	UpdateProcessorChain();
 }
 
 void UPPToolkitProcessorComponent::UpdateProcessorChain()
 {
-    PrepareProcessorChain();
-    ExecuteProcessorChain();
+	PrepareProcessorChain();
+	ExecuteProcessorChain();
 }
 
 void UPPToolkitProcessorComponent::PrepareProcessorChain()
