@@ -82,6 +82,8 @@ void UPPToolkitSceneColorCopyComponent::UpdateRenderTarget()
 		//UE_LOG(LogTemp, Log, TEXT("RTRes %p"), RTRes);
 		static const FName RendererModuleName( "Renderer" );
 		IRendererModule* RendererModule = &FModuleManager::GetModuleChecked<IRendererModule>(RendererModuleName);
+        
+        SCOPED_DRAW_EVENT(RHICmdList, PPToolkitHelperCopySceneColor);
 
 		auto RTTextureRHI = RTResource->GetRenderTargetTexture();
 		SetRenderTarget(RHICmdList, RTTextureRHI, FTextureRHIRef());
