@@ -4,6 +4,8 @@
 #include "Components/PrimitiveComponent.h"
 #include "PPToolkitHelper.generated.h"
 
+class FPPToolkitSceneViewExtension;
+
 UCLASS()
 class POSTPROCESSTOOLKIT_API APPToolkitHelper : public AActor
 {
@@ -12,16 +14,17 @@ class POSTPROCESSTOOLKIT_API APPToolkitHelper : public AActor
 public:
 	APPToolkitHelper();
     
-    UFUNCTION(CallInEditor)
-        void Refresh();
-
 	UPROPERTY(EditAnywhere)
 		class UPPToolkitSceneColorCopyComponent* SceneColorCapture;
     
     UPROPERTY(EditAnywhere)
         class UPPToolkitProcessorComponent* ProcessorChain;
+    
+    TSharedPtr<FPPToolkitSceneViewExtension, ESPMode::ThreadSafe> SceneViewExtension;
+    
+    virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 };
-
 
 
 UCLASS()
@@ -36,9 +39,7 @@ public:
 		class UTextureRenderTarget2D* RenderTarget = nullptr;
 
 public:
-	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction) override;
-    
-    void UpdateRenderTarget();
+    void UpdateRenderTarget_RenderThread(FRHICommandListImmediate& RHICmdList, FSceneView& InView);
 };
 
 
@@ -75,8 +76,6 @@ public:
     TArray<FPPToolkitProcessor> ProcessorChain;
     
 public:
-    virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction) override;
-    
     void UpdateProcessorChain();
     
 protected:
