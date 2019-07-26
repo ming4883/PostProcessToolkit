@@ -12,7 +12,9 @@
 #include "SceneViewExtension.h"
 #include "Async.h"
 
-//#include "CommonRenderResources.h"
+#if ENGINE_MINOR_VERSION >= 22
+#include "CommonRenderResources.h"
+#endif
 
 
 class FPPToolkitSceneViewExtension : public FSceneViewExtensionBase
@@ -141,7 +143,11 @@ void UPPToolkitSceneColorCopyComponent::UpdateRenderTarget_RenderThread(FRHIComm
         TShaderMapRef<FScreenVS> VertexShader(ShaderMap);
         TShaderMapRef<FScreenPS> PixelShader(ShaderMap);
 
+#if ENGINE_MINOR_VERSION >= 22
+		GraphicsPSOInit.BoundShaderState.VertexDeclarationRHI = GFilterVertexDeclaration.VertexDeclarationRHI;
+#else
         GraphicsPSOInit.BoundShaderState.VertexDeclarationRHI = RendererModule->GetFilterVertexDeclaration().VertexDeclarationRHI;
+#endif
         GraphicsPSOInit.BoundShaderState.VertexShaderRHI = GETSAFERHISHADER_VERTEX(*VertexShader);
         GraphicsPSOInit.BoundShaderState.PixelShaderRHI = GETSAFERHISHADER_PIXEL(*PixelShader);
         GraphicsPSOInit.PrimitiveType = PT_TriangleList;
