@@ -125,7 +125,10 @@ void UPPToolkitSceneColorCopyComponent::UpdateRenderTarget_RenderThread(FRHIComm
     //SCOPED_GPU_STAT(RHICmdList, PPToolkitHelperCopySceneColor);
 
     auto RTTextureRHI = RTResource->GetRenderTargetTexture();
+#if ENGINE_MINOR_VERSION <= 22
     SetRenderTarget(RHICmdList, RTTextureRHI, FTextureRHIRef());
+#endif
+
     FRHIRenderPassInfo RPInfo(RTTextureRHI, ERenderTargetActions::Load_Store);
     RHICmdList.BeginRenderPass(RPInfo, TEXT("UPPToolkitSceneColorCopyComponent"));
     {
